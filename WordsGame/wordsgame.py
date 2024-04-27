@@ -5,6 +5,9 @@ import ctypes
 import psycopg2
 from time import sleep
 import threading
+import customtkinter
+
+
 
 # Ustawienie zmiennych
 credentials = {
@@ -14,6 +17,73 @@ credentials = {
     "password": "xxx"
 }
 current_word_index = 0
+
+class TreeviewEdit(ttk.Treeview):
+    def __init__(self,master,**kw):
+        super().__init__(master,**kw)
+
+        self.bind("<Double-1>",self.on_double_click)
+
+    def on_double_click(self,event):
+        region_clicked=self.identify_region(event.x,event.y)
+        if region_clicked not in ("cell"):
+            return
+        
+        #Który item klikamy
+        column=self.identify_column(event.x)
+
+        column_index=int(column[1:])-1
+        selected_iid=self.focus()
+        selected_values=self.item(selected_iid)
+        selected_text=selected_values.get("values")[column_index]
+        
+        
+        column_box=self.bbox(selected_iid,column)
+
+
+        entry_edit=ttk.Entry(frame_word_list,width=column_box[2])
+        entry_edit.editing_column_index=column_index
+        entry_edit.editing_column_iid=selected_iid
+        entry_edit.insert(0,selected_text)
+        entry_edit.select_range(0,tk.END)
+        entry_edit.focus()
+        entry_edit.bind("<FocusOut>",self.on_focus_out)
+        entry_edit.bind("<Return>",self.on_enter)
+
+        entry_edit.place(x=column_box[0],
+                         y=column_box[1],
+                         w=column_box[2],
+                         h=column_box[3])
+        
+    def on_focus_out(self,event):
+        event.widget.destroy()
+    def on_enter (self,event):
+        new_text=event.widget.get()
+        selected_iid=event.widget.editing_column_iid
+        column_index=event.widget.editing_column_index
+
+        current_values=self.item(selected_iid).get("values")
+        
+        current_values[column_index]=new_text
+        print(current_values)
+        update_db(current_values)
+        self.item(selected_iid,values=current_values)
+
+
+        event.widget.destroy()
+        
+
+def update_db(current_values):
+    word=current_values[0]
+    meaning=current_values[1]
+    pinyin=current_values[2]
+    record_id=current_values[3]
+    conn=connect_to_database(credentials)
+    cursor = conn.cursor()
+    query = "Update wordsgame set word=%s,meaning=%s ,pinyin=%s where id=%s"
+    cursor.execute(query, (word,meaning,pinyin,record_id))
+    conn.commit()
+    cursor.close()
 
 # Funkcja do uzyskiwania rozmiaru ekranu
 def get_screen_size():
@@ -86,46 +156,29 @@ def update_word(word_id, word, meaning, pinyin):
     update_user_word(conn, word_id, word, meaning, pinyin)
 
 def refresh_word_list():
-    for widget in frame_word_list.winfo_children():
-        widget.destroy()
-
     # Pobierz słowa za pomocą polecenia SELECT
     cursor = conn.cursor()
     query = "SELECT id, word, meaning, pinyin FROM wordsgame where word is not null"
     cursor.execute(query)
     words = cursor.fetchall()
     cursor.close()
-
+    for record in words:
+        id, word,meaning, pinyin = record
+        print(f"{word},{meaning},{pinyin}")
+        frame_word_list.insert(parent="",
+                        index=tk.END,
+                        values=(f"{word}",f"{meaning}",f"{pinyin}",f"{id}"))
     # Przechowaj aktualizowane dane w liście
-    updated_words = []
+    
 
-    # Dodaj słowa do listy words
-    for word in words:
-        word_id, word_text, meaning, pinyin = word
-        entry_word = tk.Entry(frame_word_list, width=int(window_width/5))
-        entry_word.insert(0, word_text)
-        entry_word.grid(row=words.index(word), column=0, padx=5, pady=5)
-        entry_meaning = tk.Entry(frame_word_list, width=int(window_width/5))
-        entry_meaning.insert(0, meaning)
-        entry_meaning.grid(row=words.index(word), column=1, padx=5, pady=5)
-        entry_pinyin = tk.Entry(frame_word_list, width=int(window_width/5))
-        entry_pinyin.insert(0, pinyin)
-        entry_pinyin.grid(row=words.index(word), column=2, padx=5, pady=5)
 
-        # Dodaj dane do listy aktualizowanych słów
-        updated_words.append((word_id, entry_word, entry_meaning, entry_pinyin))
-
-    # Stwórz tylko jeden przycisk zapisywania, który zaktualizuje wszystkie słowa na raz
-    button_save = tk.Button(frame_word_list, text="Zapisz wszystkie", width=int(window_width/5),
-                            command=lambda: update_all_words(updated_words))
-    button_save.grid(row=len(words), column=0, columnspan=3, padx=5, pady=5)
 
 
 def start_learning():
     global words
     global current_word_index
     words = get_user_words(conn, username)
-    current_word_index = 1
+    current_word_index = 0
     frame_menu.pack_forget()
     frame_main.pack()
     display_random_word()
@@ -218,103 +271,103 @@ def update_width(event):
 
 # Funkcja do aktualizacji szerokości elementów
 def update_elements():
-    entry_username.config(width=int(window_width/16))
-    entry_password.config(width=int(window_width/16))
+    entry_username.config(width=int(window_width/8))
+    entry_password.config(width=int(window_width/8))
 
 
 # Ustawienie połączenia
 conn = connect_to_database(credentials)
 
 
-# Inicjalizacja głównego okna Tkinter
-root = tk.Tk()
-root.title("Aplikacja do nauki słówek")
-s=ttk.Style(root)
-s.theme_use("clam")
-# Ustawienie rozmiaru i położenia głównego okna
-window_width = 600
-window_height = 600
-set_window_position(root, window_width, window_height)
-
-# Ramka dla ekranu logowania
-frame_login = tk.Frame(root)
-label_username = tk.Label(frame_login, text="Użytkownik:")
-label_username.grid(row=0, column=0, padx=5, pady=5)
-entry_username = tk.Entry(frame_login, width=int(window_width/8))
-entry_username.grid(row=0, column=1, padx=10, pady=10)
-label_password = tk.Label(frame_login, text="Hasło:")
-label_password.grid(row=1, column=0, padx=5, pady=5)
-entry_password = tk.Entry(frame_login, show="*", width=int(window_width/8))
-entry_password.grid(row=1, column=1, padx=10, pady=10)
-button_login = tk.Button(frame_login, text="Zaloguj", width=int(window_width/16), command=handle_login)
-button_login.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
-button_register = tk.Button(frame_login, text="Zarejestruj", width=int(window_width/16), command=handle_registration)
-button_register.grid(row=3, column=0, columnspan=2, padx=5, pady=5)
-frame_login.pack(padx=10, pady=10)
-
-# Dodanie zdarzenia zmiany rozmiaru okna
-root.bind("<Configure>", update_width)
 
 
-# Ramka dla menu głównego
-frame_menu = tk.Frame(root)
-button_learn = tk.Button(frame_menu, text="Ucz się", width=int(window_width/16), command=start_learning)
-button_learn.pack(pady=10)
-button_add_words = tk.Button(frame_menu, text="Dodaj słowa", width=int(window_width/16), command=show_add_word_screen)
-button_add_words.pack(pady=10)
-button_word_list = tk.Button(frame_menu, text="Lista słów", width=int(window_width/16), command=show_word_list_screen)
-button_word_list.pack(pady=10)
+if __name__=="__main__":
+        # Inicjalizacja głównego okna Tkinter
+    root = tk.Tk()
+    root.title("Aplikacja do nauki słówek")
+    s=ttk.Style(root)
+    s.theme_use("clam")
+    # Ustawienie rozmiaru i położenia głównego okna
+    window_width = 600
+    window_height = 600
+    set_window_position(root, window_width, window_height)
 
-# Ramka dla dodawania słów
-frame_add_word = tk.Frame(root)
-label_han = tk.Label(frame_add_word, text="Słowo:", width=int(window_width/16))
-label_han.grid(row=0, column=0, padx=5, pady=5)
-entry_han = tk.Entry(frame_add_word, width=int(window_width/16))
-entry_han.grid(row=0, column=1, padx=5, pady=5)
-label_pinyin = tk.Label(frame_add_word, text="Pinyin:", width=int(window_width/16))
-label_pinyin.grid(row=1, column=0, padx=5, pady=5)
-entry_pinyin = tk.Entry(frame_add_word, width=int(window_width/16))
-entry_pinyin.grid(row=1, column=1, padx=5, pady=5)
-label_znaczenie = tk.Label(frame_add_word, text="Znaczenie:", width=int(window_width/16))
-label_znaczenie.grid(row=2, column=0, padx=5, pady=5)
-entry_znaczenie = tk.Entry(frame_add_word, width=int(window_width/16))
-entry_znaczenie.grid(row=2, column=1, padx=5, pady=5)
-button_add = tk.Button(frame_add_word, text="Dodaj", width=int(window_width/16), command=add_word_to_database)
-button_add.grid(row=3, column=0, columnspan=2, padx=5, pady=5)
-button_back = tk.Button(frame_add_word, text="Cofnij", width=int(window_width/16), command=back_to_menu)
-button_back.grid(row=4, column=0, columnspan=2, padx=5, pady=5)
+    # Ramka dla ekranu logowania
+    frame_login = tk.Frame(root)
+    label_username = tk.Label(frame_login, text="Użytkownik:")
+    label_username.grid(row=0, column=0, padx=5, pady=5)
+    entry_username = tk.Entry(frame_login)
+    entry_username.grid(row=0, column=1, padx=10, pady=10)
+    label_password = tk.Label(frame_login, text="Hasło:")
+    label_password.grid(row=1, column=0, padx=5, pady=5)
+    entry_password = tk.Entry(frame_login, show="*", width=int(window_width/2))
+    entry_password.grid(row=1, column=1, padx=10, pady=10)
+    button_login = tk.Button(frame_login, text="Zaloguj", width=int(window_width/16), command=handle_login)
+    button_login.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
+    button_register = tk.Button(frame_login, text="Zarejestruj", width=int(window_width/16), command=handle_registration)
+    button_register.grid(row=3, column=0, columnspan=2, padx=5, pady=5)
+    frame_login.pack(padx=10, pady=10)
 
-# Ramka dla głównej części aplikacji
-frame_main = tk.Frame(root)
-label_han = tk.Label(frame_main, font=("Helvetica", 24))
-label_han.pack(pady=20)
-label_pinyin = tk.Label(frame_main, font=("Helvetica", 16))
-label_pinyin.pack(pady=10)
-label_znaczenie = tk.Label(frame_main, font=("Helvetica", 16))
-label_znaczenie.pack(pady=10)
-button_meaning = tk.Button(frame_main, text="Znaczenie", width=int(window_width/16), command=display_meaning)
-button_meaning.pack(side=tk.LEFT, padx=10)
-button_next = tk.Button(frame_main, text="Dalej", width=int(window_width/16), command=display_random_word)
-button_next.pack(side=tk.RIGHT, padx=10)
+    # Dodanie zdarzenia zmiany rozmiaru okna
+    root.bind("<Configure>", update_width)
 
-# Ramka dla listy słów
-frame_word_list = tk.Frame(root)
-tree=ttk.Treeview(frame_word_list)
-tree["columns"]=("ID","Word","Meaning","Pinyin") 
 
-tree.column("#0",width=0,stretch=tk.NO)
-tree.column("ID",width=50,minwidth=50,anchor=tk.CENTER)
-tree.column("Word",width=50,minwidth=50,anchor=tk.CENTER)
-tree.column("Meaning",width=50,minwidth=50,anchor=tk.CENTER)
-tree.column("Pinyin",width=50,minwidth=50,anchor=tk.CENTER)
+    # Ramka dla menu głównego
+    frame_menu = tk.Frame(root)
+    button_learn = tk.Button(frame_menu, text="Ucz się", width=int(window_width/16), command=start_learning)
+    button_learn.pack(pady=10)
+    button_add_words = tk.Button(frame_menu, text="Dodaj słowa", width=int(window_width/16), command=show_add_word_screen)
+    button_add_words.pack(pady=10)
+    button_word_list = tk.Button(frame_menu, text="Lista słów", width=int(window_width/16), command=show_word_list_screen)
+    button_word_list.pack(pady=10)
 
-tree.heading("#0",text="",anchor=tk.CENTER)
-tree.heading("ID",text="ID",anchor=tk.CENTER)
-tree.heading("Word",text="Word",anchor=tk.CENTER)
-tree.heading("Meaning",text="Meaning",anchor=tk.CENTER)
-tree.heading("Pinyin",text="Pinyin",anchor=tk.CENTER)
+    # Ramka dla dodawania słów
+    frame_add_word = tk.Frame(root)
+    label_han = tk.Label(frame_add_word, text="Słowo:", width=int(window_width/16))
+    label_han.grid(row=0, column=0, padx=5, pady=5)
+    entry_han = tk.Entry(frame_add_word, width=int(window_width/16))
+    entry_han.grid(row=0, column=1, padx=5, pady=5)
+    label_pinyin = tk.Label(frame_add_word, text="Pinyin:", width=int(window_width/16))
+    label_pinyin.grid(row=1, column=0, padx=5, pady=5)
+    entry_pinyin = tk.Entry(frame_add_word, width=int(window_width/16))
+    entry_pinyin.grid(row=1, column=1, padx=5, pady=5)
+    label_znaczenie = tk.Label(frame_add_word, text="Znaczenie:", width=int(window_width/16))
+    label_znaczenie.grid(row=2, column=0, padx=5, pady=5)
+    entry_znaczenie = tk.Entry(frame_add_word, width=int(window_width/16))
+    entry_znaczenie.grid(row=2, column=1, padx=5, pady=5)
+    button_add = tk.Button(frame_add_word, text="Dodaj", width=int(window_width/16), command=add_word_to_database)
+    button_add.grid(row=3, column=0, columnspan=2, padx=5, pady=5)
+    button_back = tk.Button(frame_add_word, text="Cofnij", width=int(window_width/16), command=back_to_menu)
+    button_back.grid(row=4, column=0, columnspan=2, padx=5, pady=5)
 
-tree.pack()
+    # Ramka dla głównej części aplikacji
+    frame_main = tk.Frame(root)
+    label_han = tk.Label(frame_main, font=("Helvetica", 24))
+    label_han.pack(pady=20)
+    label_pinyin = tk.Label(frame_main, font=("Helvetica", 16))
+    label_pinyin.pack(pady=10)
+    label_znaczenie = tk.Label(frame_main, font=("Helvetica", 16))
+    label_znaczenie.pack(pady=10)
+    button_meaning = tk.Button(frame_main, text="Znaczenie", width=int(window_width/16), command=display_meaning)
+    button_meaning.pack(side=tk.LEFT, padx=10)
+    button_next = tk.Button(frame_main, text="Dalej", width=int(window_width/16), command=display_random_word)
+    button_next.pack(side=tk.RIGHT, padx=10)
 
-# Uruchomienie głównej pętli Tkinter
-root.mainloop()
+
+
+
+    # Ramka dla listy słów
+    column_names=("word","meaning","pinyin","id")
+    frame_word_list=TreeviewEdit(root,columns=column_names)
+    frame_word_list.heading('#0',text="Word")
+    frame_word_list.heading('word',text="Word")
+    frame_word_list.heading('meaning',text="Meaning")
+    frame_word_list.heading("pinyin",text="Pinyin")
+    frame_word_list.heading('id',text="ID")
+    # Ukrywanie domyślnej kolumny '#0'
+    frame_word_list.column("id", width=0, stretch=False)
+    frame_word_list.column("#0", width=0, stretch=False)
+
+
+    # Uruchomienie głównej pętli Tkinter
+    root.mainloop()
