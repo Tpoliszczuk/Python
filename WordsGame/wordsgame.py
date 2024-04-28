@@ -14,7 +14,7 @@ credentials = {
     "host": "localhost",
     "database": "postgres",
     "user": "postgres",
-    "password": "Walsie12"
+    "password": "password"
 }
 current_word_index = 0
 
