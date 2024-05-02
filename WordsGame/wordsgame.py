@@ -12,7 +12,7 @@ credentials = {
     "host": "localhost",
     "database": "postgres",
     "user": "postgres",
-    "password": "Walsie12"
+    "password": "xxxx"
 }
 current_word_index = 0
 
@@ -210,7 +210,7 @@ def show_add_word_screen():
 def add_word_to_database():
     han = entry_han.get()
     if han == '':
-         messagebox.showerror("Error", "Uou need to add word")
+         messagebox.showerror("Error", "Enter word")
          return 
     pinyin = entry_pinyin.get()
     znaczenie = entry_znaczenie.get()
