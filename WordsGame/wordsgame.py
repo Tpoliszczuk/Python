@@ -6,15 +6,18 @@ import psycopg2
 from time import sleep
 import threading
 import customtkinter as ctk
+import json
+
+
+def load_credentials_from_file(file_path):
+    with open(file_path) as f:
+        credentials = json.load(f)
+    return credentials
 
 # Connection to Postgres DB
-credentials = {
-    "host": "localhost",
-    "database": "postgres",
-    "user": "postgres",
-    "password": "xxxx"
-}
+credentials = load_credentials_from_file('credentials.json')
 current_word_index = 0
+
 
 
 class TreeviewEdit(ttk.Treeview):
@@ -117,7 +120,7 @@ def set_window_position(window, width, height):
 
 
 def connect_to_database(credentials):
-    conn = psycopg2.connect(**credentials)
+    conn = psycopg2.connect(**credentials['database'])
     return conn
 
 
@@ -192,7 +195,6 @@ def refresh_word_list():
                         index=tk.END,
                         values=(f"{word}",f"{meaning}",f"{pinyin}",f"{id}"))
 
-
 def start_learning():
     global words
     global current_word_index
@@ -210,7 +212,7 @@ def show_add_word_screen():
 def add_word_to_database():
     han = entry_han.get()
     if han == '':
-         messagebox.showerror("Error", "Enter word")
+         messagebox.showerror("Error", "Please add word")
          return 
     pinyin = entry_pinyin.get()
     znaczenie = entry_znaczenie.get()
@@ -289,7 +291,6 @@ def show_pinyin_after_delay(pinyin):
         label_pinyin.config(text=pinyin)
     except:
         pass
-
 
 
 conn = connect_to_database(credentials)
