@@ -6,18 +6,14 @@ import psycopg2
 from time import sleep
 import threading
 import customtkinter as ctk
-import json
-
-
-
-def load_credentials_from_file(file_path):
-    with open(file_path) as f:
-        credentials = json.load(f)
-    return credentials
-
 
 # Connection to Postgres DB
-credentials = load_credentials_from_file('credentials.json')
+credentials = {
+    "host": "localhost",
+    "database": "postgres",
+    "user": "postgres",
+    "password": "Walsie12"
+}
 current_word_index = 0
 
 
@@ -121,7 +117,7 @@ def set_window_position(window, width, height):
 
 
 def connect_to_database(credentials):
-    conn = psycopg2.connect(**credentials['database'])
+    conn = psycopg2.connect(**credentials)
     return conn
 
 
@@ -296,7 +292,7 @@ def show_pinyin_after_delay(pinyin):
 
 
 
-#conn = connect_to_database(credentials)
+conn = connect_to_database(credentials)
 
 
 def set_window_position(window, width, height):
