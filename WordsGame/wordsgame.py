@@ -6,15 +6,20 @@ import psycopg2
 from time import sleep
 import threading
 import customtkinter as ctk
+import json
+
+
+
+def load_credentials_from_file(file_path):
+    with open(file_path) as f:
+        credentials = json.load(f)
+    return credentials
+
 
 # Connection to Postgres DB
-credentials = {
-    "host": "localhost",
-    "database": "postgres",
-    "user": "postgres",
-    "password": "xxxx"
-}
+credentials = load_credentials_from_file('credentials.json')
 current_word_index = 0
+
 
 class TreeviewEdit(ttk.Treeview):
     def __init__(self,master,**kw):
@@ -116,7 +121,7 @@ def set_window_position(window, width, height):
 
 
 def connect_to_database(credentials):
-    conn = psycopg2.connect(**credentials)
+    conn = psycopg2.connect(**credentials['database'])
     return conn
 
 
@@ -291,7 +296,7 @@ def show_pinyin_after_delay(pinyin):
 
 
 
-conn = connect_to_database(credentials)
+#conn = connect_to_database(credentials)
 
 
 def set_window_position(window, width, height):
