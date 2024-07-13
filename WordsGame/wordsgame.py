@@ -7,6 +7,7 @@ from time import sleep
 import threading
 import customtkinter as ctk
 import json
+import random
 
 
 def load_credentials_from_file(file_path):
@@ -270,6 +271,7 @@ pinyin_lock = threading.Lock()
 def display_random_word():
     global current_word_index
     label_pinyin.config(text='')
+    current_word_index=random.randrange(0,len(words))
     if current_word_index < len(words):
         _, han, znaczenie, pinyin = words[current_word_index]
         label_han.config(text=han)
